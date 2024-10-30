@@ -44,7 +44,12 @@ typedef Vector4 vec4;
 #define xyv4(vf) v2(vf.x, vf.y)
 #define zwv4(vf) v2(vf.z, vf.w)
 #define v4zw(z, w) v4(0, 0, z, w)
-
+#define sv4zw(v, vt) \
+	do { \
+		v.z = vt.x; \
+		v.w = vt.y; \
+	} while(0)
+ 
 template <typename A, typename B>
 struct pair {
 	A a;
@@ -72,7 +77,15 @@ static bool ui_btn(Font font, const char* text, vec4 dest, bool enabled = true) 
 	vec2 text_size = MeasureTextEx(font, text, font.baseSize, 2.f);	
 	vec2 text_pos = xyv4(dest) + v2(((dest.z - text_size.x) * .5f), ((dest.w - text_size.y) * .5f)); 
 
-	DrawRectangleRec(to_rect(dest), hover ? ColorBrightness(RED, .3) : RED);
+	Color color = RED;
+	if (hover) {
+		color = ColorBrightness(color, .4f);
+	} 
+	if (!enabled) {
+		color = ColorTint(color, DARKGRAY);
+	}
+
+	DrawRectangleRec(to_rect(dest), color);
 	DrawTextEx(font, text, text_pos, 32, 2, WHITE);
 
 	return click && enabled;
@@ -84,10 +97,19 @@ static vec4 text_size(Font font, const char* text) {
 }
 
 static void label(Font font, const char* text, vec2 pos, Color color = WHITE) {
-
 	DrawTextEx(font, text, pos, font.baseSize, 2, color);
 }
 
 static void center_x(vec4 where, vec4* who) {
 	who->x += floorf((where.z - who->z) * .5);
+}
+
+static void br_of(vec4 where, vec4* who) {
+	who->x = where.x + where.z - who->z;
+	who->y = where.y + where.w - who->w;
+}
+
+static void pad_br(vec4* who, float amt) {
+	who->x -= amt;
+	who->y -= amt;
 }
