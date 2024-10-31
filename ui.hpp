@@ -25,6 +25,14 @@ static vec2 operator-(vec2 self, vec2 other) {
 	return {self.x - other.x, self.y - other.y};
 }
 
+static vec2 operator-(vec2 self, float other) {
+	return {self.x - other, self.y - other};
+}
+
+static vec2 operator+(vec2 self, float other) {
+	return {self.x + other, self.y + other};
+}
+
 static vec2 operator+(vec2 self, vec2 other) {
 	return {self.x + other.x, self.y + other.y};
 }
