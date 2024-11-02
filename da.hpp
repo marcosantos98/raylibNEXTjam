@@ -34,17 +34,29 @@ struct daa {
 		return items[--count];
 	}
 
-    size_t total_size() const {
-        return sizeof(T) * count;
-    }
+  size_t total_size() const {
+      return sizeof(T) * count;
+  }
 
-    T *data() const {
-        return items;
-    }
+  T *data() const {
+      return items;
+  }
 
-    void clear() {
-        count = 0;
-    }
+  void clear() {
+      count = 0;
+  }
+
+  T operator[](int index) const {
+      return items[index];
+  }
+
+  int len() const {
+      return count;
+  }
+
+  T last() const {
+      return items[count - 1];
+  }
 };
 
 template <typename T>

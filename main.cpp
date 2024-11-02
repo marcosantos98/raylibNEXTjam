@@ -29,14 +29,14 @@ T* alloc(size_t size, GrowingArena* arena = &allocator) {
 static int map[MAP_SZ*MAP_SZ]{
 	0,0,0,0,0,0,0,0,0,0,
 	0,0,0,0,0,0,0,0,0,0,
-	0,0,0,0,0,0,0,0,0,0,
-	0,0,0,0,0,0,0,0,0,0,
-	0,0,0,0,0,0,0,0,0,0,
-	0,0,0,0,0,2,0,0,0,0,
-	0,0,0,0,0,0,0,0,0,0,
+	0,0,0,0,0,0,0,4,0,0,
+	0,3,4,0,0,0,0,0,3,0,
+	0,7,0,0,0,8,5,0,2,0,
+	0,0,0,0,0,6,0,0,0,0,
+	0,0,9,5,6,0,0,0,0,0,
 	0,0,0,0,0,0,0,0,0,1,
-	0,0,0,0,0,0,0,0,0,2,
-	0,1,0,0,0,0,0,0,0,0,
+	0,8,0,7,0,0,0,0,0,2,
+	0,1,0,0,0,0,0,0,0,9,
 };
 
 static int filled_map[MAP_SZ*MAP_SZ]{};
@@ -61,7 +61,14 @@ Connection create(vec2 start, vec2 end, int id, Color color) {
 
 static Connection connections[]{
 	create(v2(1, 9), v2(9, 7), 1, PINK),
-	create(v2(5, 5), v2(9, 8), 2, BLUE),
+	create(v2(8, 4), v2(9, 8), 2, BLUE),
+	create(v2(8, 3), v2(1, 3), 3, GREEN),
+	create(v2(2, 3), v2(7, 2), 4, PINK),
+	create(v2(3, 6), v2(6, 4), 5, BLUE),
+	create(v2(4, 6), v2(7, 5), 6, GREEN),
+	create(v2(1, 4), v2(3, 8), 7, PINK),
+	create(v2(1, 8), v2(5, 4), 8, BLUE),
+	create(v2(9, 9), v2(2, 6), 9, GREEN),
 };
 
 static Connection *current_connection;
@@ -71,8 +78,21 @@ static RenderTexture2D game, post_process_1;
 
 // :load
 static Font font16, font32;
-static Texture2D back, flower_0, flower_1, spot_back;
+static Texture2D back, spot_back;
+static Texture2D flower_0;
+static Texture2D flower_1;
+static Texture2D flower_2;
+static Texture2D flower_3;
+static Texture2D flower_4;
+static Texture2D flower_5;
+static Texture2D flower_6;
+static Texture2D flower_7;
+static Texture2D flower_8;
+static Texture2D flower_9;
+static Texture2D flower_10;
+static Texture2D flower_11;
 
+static vec2 prev_hover_cell{};
 static vec2 hover_cell{};
 
 static daa<vec2> current_points;
@@ -87,6 +107,26 @@ Texture tex_from_id(int id) {
 			return flower_0;
 		case 2:
 			return flower_1;
+		case 3:
+			return flower_2;
+		case 4:
+			return flower_3;
+		case 5:
+			return flower_4;
+		case 6:
+			return flower_5;
+		case 7:
+			return flower_6;
+		case 8:
+			return flower_7;
+		case 9:
+			return flower_8;
+		case 10:
+			return flower_9;
+		case 11:
+			return flower_10;
+		case 12:
+			return flower_11;
 	}
 	return {};
 }
@@ -118,6 +158,16 @@ void init() {
 	back = LoadTexture("./res/thing.png");
 	flower_0 = LoadTexture("./res/flower_0.png");
 	flower_1 = LoadTexture("./res/flower_1.png");
+	flower_2 = LoadTexture("./res/flower_2.png");
+	flower_3 = LoadTexture("./res/flower_3.png");
+	flower_4 = LoadTexture("./res/flower_4.png");
+	flower_5 = LoadTexture("./res/flower_5.png");
+	flower_6 = LoadTexture("./res/flower_6.png");
+	flower_7 = LoadTexture("./res/flower_7.png");
+	flower_8 = LoadTexture("./res/flower_8.png");
+	flower_9 = LoadTexture("./res/flower_9.png");
+	flower_10 = LoadTexture("./res/flower_10.png");
+	flower_11 = LoadTexture("./res/flower_11.png");
 	spot_back = LoadTexture("./res/spot_back_w.png");
 }
 
@@ -161,14 +211,21 @@ void update() {
 			}
 		}
 
+		
 		// Have connection append to it!
 		bool has_target{};
-		if (current_connection && IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+		if (current_connection && IsMouseButtonDown(MOUSE_BUTTON_LEFT) && prev_hover_cell != hover_cell) {
 			if (is_free(hover_cell)) {
-				vec2 to_check = current_connection->points.items[0] == current_connection->start ? current_connection->end : current_connection->start;
+				vec2 to_check = current_connection->points[0] == current_connection->start ? current_connection->end : current_connection->start;
 				if (hover_cell != to_check) {
-					current_connection->points.append(hover_cell);
+					vec2 last_point = current_connection->points[current_connection->points.count-2];
+					if (last_point == hover_cell) {
+						current_connection->points.pop();
+					} else {
+						current_connection->points.append(hover_cell);
+					}
 				} else if(hover_cell == to_check && id_at(hover_cell) == current_connection->id) {
+					current_connection->points.append(hover_cell);
 					has_target = true;
 				}
 			} else {
@@ -198,12 +255,10 @@ void update() {
 			}
 			current_connection = NULL;
 		}
-	} else {
-		if (current_connection) {
-			current_connection->points.clear();
-			current_connection = NULL;
-		}
-	}
+	} 
+	
+
+	prev_hover_cell = hover_cell;
 }
 
 void render() {
@@ -215,7 +270,7 @@ void render() {
 		BeginMode2D(cam);
 		{
 
-			DrawRectangle(-90, -90, 500, 500, DARKGREEN);
+			DrawRectangle(-90, -90, 500, 500, BROWN);
 
 			// :spots
 			for (int y = 0; y < MAP_SZ; y++) {
@@ -230,7 +285,7 @@ void render() {
 					if (c.points.count > 1) {
 						vec2 last_point = c.points.items[0];
 						for(int i = 1; i < c.points.count; i++) {
-							DrawLineEx((last_point * CELL_SZ) + CELL_SZ / 2.f, (c.points.items[i] * CELL_SZ) + CELL_SZ / 2.f, 2.f, c.color);
+							DrawLineEx((last_point * CELL_SZ) + CELL_SZ / 2.f, (c.points.items[i] * CELL_SZ) + CELL_SZ / 2.f, 6.f, c.color);
 							last_point = c.points.items[i];
 						}
 					}
@@ -248,22 +303,25 @@ void render() {
 					DrawTextureEx(tex, pos-9, 0, .8f, WHITE);
 				}
 			}
-#if 1
+#if 0
 			for (int y = 0; y < MAP_SZ; y++) {
 				for (int x = 0; x < MAP_SZ; x++) {
 					int at = filled_map[y*MAP_SZ+x];
+					int at2 = map[y*MAP_SZ+x];
 					vec2 pos = v2(x, y) * CELL_SZ;
 					if (at == 0) continue;
 					vec2 size = v2of(CELL_SZ);
 					DrawRectangleV(pos, size,  WHITE);
+					DrawText(TextFormat("%d", at2), pos.x, pos.y, 10, BLACK);
 				}
 			}
 #endif	
 			DrawTexture(back, -180/2, -180/2, WHITE);
 			
 			if (hover_cell.x >= 0 && hover_cell.x <= 9 && hover_cell.y >= 0 && hover_cell.y <= 9) {
+				int at = map[int(hover_cell.y * MAP_SZ + hover_cell.x)];
 				hover_cell = hover_cell * CELL_SZ;
-				DrawRectangleLinesEx({hover_cell.x, hover_cell.y, CELL_SZ, CELL_SZ}, 2.f, RED);
+				DrawRectangleLinesEx({hover_cell.x, hover_cell.y, CELL_SZ, CELL_SZ}, 2.f, at == 0 ? RED : GREEN);
 			}
 		}
 		EndMode2D();	
@@ -295,6 +353,11 @@ void render() {
 				WHITE);
 
 #if 1
+		if (current_connection) {
+			for (int i = 0; i < current_connection->points.count; i+=1) {
+				DrawTextEx(font16, TextFormat("[%d] %f %f", i, current_connection->points.items[i].x, current_connection->points.items[i].y), v2(10, i * 16), 16, 2, WHITE);
+			}
+		}
 		// auto text = TextFormat("%.2f, %.2f", start_line.x, start_line.y);
 		// vec2 size = MeasureTextEx(font32, text, 32, 2);
 		// DrawTextEx(font32, text, {window_size.x - size.x - 10, 10}, 32, 2, WHITE);
