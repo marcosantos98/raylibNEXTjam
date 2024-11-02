@@ -1,6 +1,7 @@
 #include <cstddef>
 #include <cstdio>
 
+#include <cstring>
 #include <raylib.h>
 #include <raymath.h>
 
@@ -25,20 +26,9 @@ T* alloc(size_t size, GrowingArena* arena = &allocator) {
 #define CELL_SZ 32
 #define V2_ZERO v2of(0)
 #define INV v2of(-1)
-
-static int map[MAP_SZ*MAP_SZ]{
-	0,0,0,0,0,0,0,0,0,0,
-	0,0,0,0,0,0,0,0,0,0,
-	0,0,0,0,0,0,0,4,0,0,
-	0,3,4,0,0,0,0,0,3,0,
-	0,7,0,0,0,8,5,0,2,0,
-	0,0,0,0,0,6,0,0,0,0,
-	0,0,9,5,6,0,0,0,0,0,
-	0,0,0,0,0,0,0,0,0,1,
-	0,8,0,7,0,0,0,0,0,2,
-	0,1,0,0,0,0,0,0,0,9,
-};
-
+#define MAX_CONNECTIONS 12
+#define PATH_ALIIVE_TIME 0.2
+static int map[MAP_SZ*MAP_SZ]{};
 static int filled_map[MAP_SZ*MAP_SZ]{};
 
 struct Connection {
@@ -47,6 +37,7 @@ struct Connection {
 	vec2 end;
 	int id;
 	Color color;
+	bool done;
 };
 
 Connection create(vec2 start, vec2 end, int id, Color color) {
@@ -59,17 +50,42 @@ Connection create(vec2 start, vec2 end, int id, Color color) {
 	return c;
 }
 
-static Connection connections[]{
-	create(v2(1, 9), v2(9, 7), 1, PINK),
-	create(v2(8, 4), v2(9, 8), 2, BLUE),
-	create(v2(8, 3), v2(1, 3), 3, GREEN),
-	create(v2(2, 3), v2(7, 2), 4, PINK),
-	create(v2(3, 6), v2(6, 4), 5, BLUE),
-	create(v2(4, 6), v2(7, 5), 6, GREEN),
-	create(v2(1, 4), v2(3, 8), 7, PINK),
-	create(v2(1, 8), v2(5, 4), 8, BLUE),
-	create(v2(9, 9), v2(2, 6), 9, GREEN),
+struct Level {
+	Connection connections[MAX_CONNECTIONS];
 };
+
+static Level levels[]{
+	{
+		.connections = {
+			create(v2(1, 9), v2(9, 7), 1, RED),
+			create(v2(8, 4), v2(9, 8), 2, BLUE),
+			create(v2(8, 3), v2(1, 3), 3, GREEN),
+			create(v2(2, 3), v2(7, 2), 4, RED),
+			create(v2(3, 6), v2(6, 4), 5, BLUE),
+			create(v2(4, 6), v2(5, 5), 6, GREEN),
+			create(v2(1, 4), v2(3, 8), 7, RED),
+			create(v2(1, 8), v2(5, 4), 8, BLUE),
+			create(v2(9, 9), v2(2, 6), 9, GREEN),
+		}
+	},
+	{
+		.connections = {
+			create(v2(0, 3), v2(8, 9), 1, RED),
+			create(v2(0, 5), v2(4, 5), 2, BLUE),
+			create(v2(1, 1), v2(8, 6), 3, GREEN),
+			create(v2(1, 5), v2(3, 3), 4, RED),
+			create(v2(1, 8), v2(7, 8), 5, BLUE),
+			create(v2(2, 6), v2(7, 9), 6, GREEN),
+			create(v2(2, 8), v2(4, 8), 7, RED),
+			create(v2(4, 3), v2(5, 6), 8, BLUE),
+			create(v2(6, 2), v2(8, 8), 9, GREEN),
+			create(v2(7, 2), v2(7, 6), 10, RED),
+		}
+	}
+};
+
+static int level_id{};
+static Level current_level = levels[level_id];
 
 static Connection *current_connection;
 
@@ -94,12 +110,6 @@ static Texture2D flower_11;
 
 static vec2 prev_hover_cell{};
 static vec2 hover_cell{};
-
-static daa<vec2> current_points;
-static bool start_line{};
-static int current_i{};
-static vec2 end_line{};
-static bool completed = false;
 
 Texture tex_from_id(int id) {
 	switch (id) {
@@ -135,6 +145,82 @@ void printv(vec2 v) {
 	printf("%f, %f\n", v.x, v.y);
 }
 
+enum ParticleType {
+	NONE,
+	PATH,
+};
+
+struct Particle {
+	ParticleType type;
+	vec2 pos, vel, dir, size;
+	Color color;
+	float t;
+	bool valid;
+};
+
+#define MAX_PARTICLES 1024
+struct ParticleSpawner {
+	Particle particles[MAX_PARTICLES];
+};
+static ParticleSpawner particle_spawner{};
+
+void update_particles() {
+	for(auto &p : particle_spawner.particles) {
+		if (!p.valid) continue;
+		switch(p.type) {
+			case NONE: break;
+			case PATH: {
+					p.pos = p.pos + ((p.vel * p.dir) * GetFrameTime());
+					p.t -= GetFrameTime();
+					if (p.t <= 0) {
+						p.valid = false;
+					}
+			} break;
+		}
+	}
+}
+
+void render_particle() {
+	for(auto p : particle_spawner.particles) {
+		if (!p.valid) continue;
+		switch(p.type) {
+			case NONE: break;
+			case PATH: {
+					float alpha = 1 * (p.t / PATH_ALIIVE_TIME);
+					DrawRectangleV(p.pos, p.size, ColorAlpha(p.color, alpha));
+			} break;
+		}
+	}
+}
+
+void add_particle(Particle particle) {
+	for (auto &p : particle_spawner.particles) {
+		if (p.valid) continue;
+		p.valid = true;
+		p.color = particle.color;
+		p.pos = particle.pos;
+		p.vel = particle.vel;
+		p.dir = particle.dir;
+		p.t = particle.t;
+		p.size = particle.size;
+		p.type = particle.type;
+		break;
+	}
+}
+
+void next_level() {
+	memset(map, 0, sizeof(int) * (MAP_SZ * MAP_SZ));
+	memset(filled_map, 0, sizeof(int) * (MAP_SZ * MAP_SZ));
+	current_level = levels[++level_id];
+	
+	for(auto c : current_level.connections) {
+		int start_index = c.start.y * MAP_SZ + c.start.x;
+		int end_index = c.end.y * MAP_SZ + c.end.x;
+		map[start_index] = c.id;
+		map[end_index] = c.id;
+	}
+}
+
 void init() {
 	//:init
 	
@@ -146,11 +232,6 @@ void init() {
 	game = LoadRenderTexture(window_size.x, window_size.y);
 	post_process_1 = LoadRenderTexture(window_size.x, window_size.y);
 
-	
-	end_line = INV;
-
-	current_points = make<vec2>(&allocator);
-	
 	// :load
 	font16 = LoadFontEx("./res/arial.ttf", 16, 0, 96);
 	font32 = LoadFontEx("./res/arial.ttf", 32, 0, 96);
@@ -169,6 +250,27 @@ void init() {
 	flower_10 = LoadTexture("./res/flower_10.png");
 	flower_11 = LoadTexture("./res/flower_11.png");
 	spot_back = LoadTexture("./res/spot_back_w.png");
+
+	for(auto c : current_level.connections) {
+		int start_index = c.start.y * MAP_SZ + c.start.x;
+		int end_index = c.end.y * MAP_SZ + c.end.x;
+		map[start_index] = c.id;
+		map[end_index] = c.id;
+	}
+}
+
+void add_path_particle(vec2 pos) {
+	vec2 render_pos = pos * CELL_SZ;
+	Particle particle = {
+		.type = PATH,
+		.pos = render_pos,
+		.vel = v2(GetRandomValue(230, 250), GetRandomValue(230, 250)),
+		.dir = v2(GetRandomValue(-1, 1), GetRandomValue(-1, 1)),
+		.size = v2of(10),
+		.color = current_connection->color,
+		.t = PATH_ALIIVE_TIME,
+	};
+	add_particle(particle);
 }
 
 void update() {
@@ -178,7 +280,7 @@ void update() {
 	hover_cell.y = c(int, hover_cell.y) >> 5;
 
 	auto in_bounds = [](vec2 hover_cell){
-		return hover_cell.x >= 0 && hover_cell.x <= 9 && hover_cell.y >= 0 && hover_cell.y <= 9;
+		return hover_cell.x >= -1 && hover_cell.x <= 10 && hover_cell.y >= -1 && hover_cell.y <= 10;
 	};
 
 	auto id_at = [](vec2 at) {
@@ -189,11 +291,15 @@ void update() {
 		return filled_map[int(at.y * MAP_SZ + at.x)] == 0;
 	};
 	
-	if (in_bounds(hover_cell)) {
 
-		// Is connnection
+	// Is connnection
+
+	if (in_bounds(hover_cell)) {
+		hover_cell.x = Clamp(hover_cell.x, 0, MAP_SZ - 1);
+		hover_cell.y = Clamp(hover_cell.y, 0, MAP_SZ - 1);
+	
 		if (current_connection == NULL && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-			for (auto &c : connections) {
+			for (auto &c : current_level.connections) {
 				// Check if hover is either start or end
 				if ((hover_cell == c.start || hover_cell == c.end) && id_at(hover_cell) == c.id) {
 					current_connection = &c;
@@ -201,7 +307,8 @@ void update() {
 						for (int i = 0; i < current_connection->points.count; i+= 1) {
 							vec2 p = current_connection->points.items[i];
 							filled_map[int(p.y * MAP_SZ + p.x)] = 0;	
-						}	
+						}
+						c.done = false;	
 						c.points.clear();				
 					} else {
 						c.points.append(hover_cell);
@@ -210,12 +317,11 @@ void update() {
 				}
 			}
 		}
-
 		
 		// Have connection append to it!
 		bool has_target{};
 		if (current_connection && IsMouseButtonDown(MOUSE_BUTTON_LEFT) && prev_hover_cell != hover_cell) {
-			if (is_free(hover_cell)) {
+			if (is_free(hover_cell) && (id_at(hover_cell) == 0 || id_at(hover_cell) == current_connection->id)) {
 				vec2 to_check = current_connection->points[0] == current_connection->start ? current_connection->end : current_connection->start;
 				if (hover_cell != to_check) {
 					vec2 last_point = current_connection->points[current_connection->points.count-2];
@@ -223,6 +329,7 @@ void update() {
 						current_connection->points.pop();
 					} else {
 						current_connection->points.append(hover_cell);
+						add_path_particle(hover_cell);
 					}
 				} else if(hover_cell == to_check && id_at(hover_cell) == current_connection->id) {
 					current_connection->points.append(hover_cell);
@@ -237,7 +344,6 @@ void update() {
 				current_connection = NULL;
 			}
 		}
-
 		// Check if is one of start points or remove!
 		if (current_connection && IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
 			if (id_at(hover_cell) != current_connection->id) {
@@ -247,18 +353,18 @@ void update() {
 				has_target = true;
 			}
 		}
-
 		if (has_target) {
 			for (int i = 0; i < current_connection->points.count; i+= 1) {
 				vec2 p = current_connection->points.items[i];
 				filled_map[int(p.y * MAP_SZ + p.x)] = 1;	
 			}
+			current_connection->done = true;
 			current_connection = NULL;
 		}
-	} 
-	
-
+	}
 	prev_hover_cell = hover_cell;
+
+	update_particles();
 }
 
 void render() {
@@ -281,7 +387,7 @@ void render() {
 			}	
 			// :line
 			{
-				for (auto c : connections) {
+				for (auto c : current_level.connections) {
 					if (c.points.count > 1) {
 						vec2 last_point = c.points.items[0];
 						for(int i = 1; i < c.points.count; i++) {
@@ -321,8 +427,13 @@ void render() {
 			if (hover_cell.x >= 0 && hover_cell.x <= 9 && hover_cell.y >= 0 && hover_cell.y <= 9) {
 				int at = map[int(hover_cell.y * MAP_SZ + hover_cell.x)];
 				hover_cell = hover_cell * CELL_SZ;
+				if (at) {
+					DrawText(TextFormat("%d", at), hover_cell.x + 10, hover_cell.y + 10, 10, ORANGE);
+				}
 				DrawRectangleLinesEx({hover_cell.x, hover_cell.y, CELL_SZ, CELL_SZ}, 2.f, at == 0 ? RED : GREEN);
 			}
+
+			render_particle();
 		}
 		EndMode2D();	
 	}
@@ -331,6 +442,7 @@ void render() {
 	// :post_1
 	BeginTextureMode(post_process_1);
 	{
+		ClearBackground(BLANK);
 		DrawTexturePro(game.texture, 
 			{0, 0, c(float, game.texture.width), c(float, -game.texture.height)},
 			{0, 0, c(float, game.texture.width), c(float, game.texture.height)},
@@ -399,8 +511,17 @@ void render() {
 				br_of(screen, &dnext);
 				pad_br(&dnext, 10);
 
-				if (ui_btn(font32, "Next", dnext, completed)) {
-					
+				bool enabled = true;
+				if (ui_btn(font32, "Next", dnext, enabled)) {
+					// for (auto c : current_level.connections) {
+					// 	if (c.id == 0) continue;
+					// 	if (!c.done) {
+					// 		enabled = false;
+					// 		printf("%d not enabled!\n", c.id); printv(c.start); printv(c.end);
+					// 		break;
+					// 	}
+					// }
+					next_level();	
 				}
 			}
 
