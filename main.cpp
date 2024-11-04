@@ -27,7 +27,14 @@ T* alloc(size_t size, GrowingArena* arena = &allocator) {
 #define V2_ZERO v2of(0)
 #define INV v2of(-1)
 #define MAX_CONNECTIONS 12
-#define PATH_ALIIVE_TIME 0.2
+#define PATH_ALIIVE_TIME 0.6
+#define LINE_WIDTH 8
+#define MUSIC_VOLUME .7
+
+static vec2 last_hover{};
+static vec2 current_hover{};
+static float hover_timer{};
+
 static int map[MAP_SZ*MAP_SZ]{};
 static int filled_map[MAP_SZ*MAP_SZ]{};
 
@@ -52,6 +59,7 @@ Connection create(vec2 start, vec2 end, int id, Color color) {
 
 struct Level {
 	Connection connections[MAX_CONNECTIONS];
+	int nc;
 };
 
 static Level levels[]{
@@ -66,7 +74,8 @@ static Level levels[]{
 			create(v2(1, 4), v2(3, 8), 7, RED),
 			create(v2(1, 8), v2(5, 4), 8, BLUE),
 			create(v2(9, 9), v2(2, 6), 9, GREEN),
-		}
+		},
+		.nc = 9,
 	},
 	{
 		.connections = {
@@ -80,20 +89,142 @@ static Level levels[]{
 			create(v2(4, 3), v2(5, 6), 8, BLUE),
 			create(v2(6, 2), v2(8, 8), 9, GREEN),
 			create(v2(7, 2), v2(7, 6), 10, RED),
-		}
+		},
+		.nc = 10,
+	},
+	{
+		.connections = {
+			create(v2(0, 9), v2(3, 2), 1, RED),
+			create(v2(0, 5), v2(9, 6), 2, BLUE),
+			create(v2(1, 1), v2(1, 5), 3, GREEN),
+			create(v2(1, 7), v2(6, 8), 4, RED),
+			create(v2(2, 1), v2(6, 5), 5, BLUE),
+			create(v2(2, 2), v2(6, 3), 6, GREEN),
+			create(v2(2, 8), v2(3, 7), 7, RED),
+			create(v2(3, 6), v2(4, 7), 8, BLUE),
+			create(v2(3, 5), v2(5, 7), 9, GREEN),
+			create(v2(4, 9), v2(7, 6), 10, RED),
+			create(v2(6, 6), v2(8, 8), 11, BLUE),
+		},
+		.nc = 11,
+	},	
+	{
+		.connections = {
+			create(v2(0, 9), v2(9, 2), 1, RED),
+			create(v2(1, 4), v2(7, 9), 2, BLUE),
+			create(v2(2, 2), v2(4, 9), 3, GREEN),
+			create(v2(2, 3), v2(7, 7), 4, RED),
+			create(v2(2, 4), v2(4, 4), 5, BLUE),
+			create(v2(2, 8), v2(3, 4), 6, GREEN),
+			create(v2(4, 8), v2(6, 7), 7, RED),
+			create(v2(5, 4), v2(6, 6), 8, BLUE),
+		},
+		.nc = 8,
+	},
+	{
+		.connections = {
+			create(v2(0, 6), v2(5, 5), 1, RED),
+			create(v2(0, 7), v2(5, 8), 2, BLUE),
+			create(v2(0, 8), v2(3, 9), 3, GREEN),
+			create(v2(1, 8), v2(7, 9), 4, RED),
+			create(v2(2, 0), v2(6, 8), 5, BLUE),
+			create(v2(2, 1), v2(6, 0), 6, GREEN),
+			create(v2(2, 3), v2(3, 2), 7, RED),
+			create(v2(3, 0), v2(8, 5), 8, BLUE),
+			create(v2(4, 0), v2(8, 1), 9, GREEN),
+			create(v2(7, 7), v2(9, 9), 10, RED),
+			create(v2(8, 7), v2(9, 8), 11, BLUE),
+		},
+		.nc = 11,
+	},		
+	{
+		.connections = {
+			create(v2(0, 0), v2(1, 8), 1, RED),
+			create(v2(1, 1), v2(7, 2), 2, BLUE),
+			create(v2(1, 4), v2(4, 3), 3, GREEN),
+			create(v2(1, 9), v2(2, 3), 4, RED),
+			create(v2(2, 4), v2(5, 3), 5, BLUE),
+			create(v2(3, 8), v2(7, 6), 6, GREEN),
+			create(v2(3, 7), v2(8, 4), 7, RED),
+			create(v2(4, 7), v2(9, 0), 8, BLUE),
+			create(v2(9, 1), v2(9, 9), 9, GREEN),
+		},
+		.nc = 9,
+	},		
+	{
+		.connections = {
+			create(v2(0, 2), v2(5, 0), 1, RED),
+			create(v2(0, 3), v2(3, 3), 2, BLUE),
+			create(v2(1, 7), v2(2, 9), 3, GREEN),
+			create(v2(1, 8), v2(7, 2), 4, RED),
+			create(v2(3, 2), v2(3, 4), 5, BLUE),
+			create(v2(3, 5), v2(5, 1), 6, GREEN),
+			create(v2(3, 8), v2(7, 5), 7, RED),
+			create(v2(3, 9), v2(4, 2), 8, BLUE),
+			create(v2(6, 0), v2(9, 0), 9, GREEN),
+			create(v2(6, 6), v2(8, 2), 10, RED),
+			create(v2(7, 8), v2(8, 5), 11, BLUE),
+		},
+		.nc = 11,
+	},
+	{
+		.connections = {
+			create(v2(1, 2), v2(7, 7), 1, RED),
+			create(v2(1, 3), v2(1, 6), 2, BLUE),
+			create(v2(1, 7), v2(3, 8), 3, GREEN),
+			create(v2(1, 8), v2(4, 7), 4, RED),
+			create(v2(4, 6), v2(6, 3), 5, BLUE),
+			create(v2(1, 9), v2(6, 9), 6, GREEN),
+			create(v2(4, 4), v2(6, 7), 7, RED),
+			create(v2(4, 5), v2(5, 3), 8, BLUE),
+			create(v2(5, 5), v2(5, 9), 9, GREEN),
+			create(v2(8, 1), v2(6, 8), 10, RED),
+		},
+		.nc = 10,
+	},		
+	{
+		.connections = {
+			create(v2(0, 0), v2(3, 3), 1, RED),
+			create(v2(0, 1), v2(2, 3), 2, BLUE),
+			create(v2(0, 2), v2(8, 8), 3, GREEN),
+			create(v2(0, 4), v2(3, 0), 4, RED),
+			create(v2(1, 6), v2(2, 8), 5, BLUE),
+			create(v2(2, 4), v2(3, 6), 6, GREEN),
+			create(v2(5, 2), v2(8, 2), 7, RED),
+			create(v2(5, 3), v2(8, 1), 8, BLUE),
+			create(v2(6, 1), v2(7, 5), 9, GREEN),
+			create(v2(8, 3), v2(9, 6), 10, RED),
+		},
+		.nc = 10,
+	},
+	{
+		.connections = {
+			create(v2(0, 1), v2(2, 9), 1, RED),
+			create(v2(0, 8), v2(7, 6), 2, BLUE),
+			create(v2(0, 9), v2(8, 8), 3, GREEN),
+			create(v2(1, 6), v2(7, 4), 4, RED),
+			create(v2(2, 2), v2(5, 4), 5, BLUE),
+			create(v2(2, 4), v2(8, 7), 6, GREEN),
+			create(v2(3, 7), v2(5, 7), 7, RED),
+			create(v2(8, 2), v2(9, 0), 8, BLUE),
+			create(v2(9, 1), v2(9, 5), 9, GREEN),
+		},
+		.nc = 9,
 	}
 };
 
-static int level_id{};
-static Level current_level = levels[level_id];
+static int level_id = -1;
+static Level current_level;
 
 static Connection *current_connection;
 
 static Camera2D cam{};
 static RenderTexture2D game, post_process_1;
 
+static bool muted{};
+
 // :load
-static Font font16, font32;
+static Font font16, font32, font64;
 static Texture2D back, spot_back;
 static Texture2D flower_0;
 static Texture2D flower_1;
@@ -107,9 +238,24 @@ static Texture2D flower_8;
 static Texture2D flower_9;
 static Texture2D flower_10;
 static Texture2D flower_11;
+static Texture2D is_muted, not_muted;
+
+static Sound add_point;
+static Sound complete_point;
+static Sound fail;
+static Music loop_back;
 
 static vec2 prev_hover_cell{};
 static vec2 hover_cell{};
+
+static float volume{};
+
+// :level_anim
+static float anim_time{};
+static bool start_anim{};
+static vec2 quad_info{};
+static bool change_level{};
+static vec2 text_info{};
 
 Texture tex_from_id(int id) {
 	switch (id) {
@@ -153,6 +299,7 @@ enum ParticleType {
 struct Particle {
 	ParticleType type;
 	vec2 pos, vel, dir, size;
+	vec2 off;
 	Color color;
 	float t;
 	bool valid;
@@ -170,9 +317,16 @@ void update_particles() {
 		switch(p.type) {
 			case NONE: break;
 			case PATH: {
-					p.pos = p.pos + ((p.vel * p.dir) * GetFrameTime());
-					p.t -= GetFrameTime();
-					if (p.t <= 0) {
+					if (p.dir.y != 0) {
+						p.pos.x += (p.vel.x * GetFrameTime());
+						p.pos.y += (p.vel.y * p.dir.y * GetFrameTime());
+					} else {
+						p.pos.x += (p.vel.x * p.dir.x * GetFrameTime());
+						p.pos.y += (p.vel.y * GetFrameTime());						
+					}
+					p.t += GetFrameTime();
+					p.size.x = 8 * (p.t / PATH_ALIIVE_TIME);
+					if (p.t >= PATH_ALIIVE_TIME) {
 						p.valid = false;
 					}
 			} break;
@@ -187,7 +341,7 @@ void render_particle() {
 			case NONE: break;
 			case PATH: {
 					float alpha = 1 * (p.t / PATH_ALIIVE_TIME);
-					DrawRectangleV(p.pos, p.size, ColorAlpha(p.color, alpha));
+					DrawCircleV(p.pos, p.size.x, ColorAlpha(p.color, alpha));
 			} break;
 		}
 	}
@@ -204,7 +358,14 @@ void add_particle(Particle particle) {
 		p.t = particle.t;
 		p.size = particle.size;
 		p.type = particle.type;
+		p.off = particle.off;
 		break;
+	}
+}
+
+void add_particles(Particle particle, int amnt) {
+	for (int i = 0; i < amnt; i+=1) {
+		add_particle(particle);
 	}
 }
 
@@ -213,7 +374,8 @@ void next_level() {
 	memset(filled_map, 0, sizeof(int) * (MAP_SZ * MAP_SZ));
 	current_level = levels[++level_id];
 	
-	for(auto c : current_level.connections) {
+	for(int i = 0; i < current_level.nc; i+=1) {
+		auto c = current_level.connections[i];
 		int start_index = c.start.y * MAP_SZ + c.start.x;
 		int end_index = c.end.y * MAP_SZ + c.end.x;
 		map[start_index] = c.id;
@@ -235,6 +397,7 @@ void init() {
 	// :load
 	font16 = LoadFontEx("./res/arial.ttf", 16, 0, 96);
 	font32 = LoadFontEx("./res/arial.ttf", 32, 0, 96);
+	font64 = LoadFontEx("./res/arial.ttf", 64, 0, 96);
 
 	back = LoadTexture("./res/thing.png");
 	flower_0 = LoadTexture("./res/flower_0.png");
@@ -250,31 +413,76 @@ void init() {
 	flower_10 = LoadTexture("./res/flower_10.png");
 	flower_11 = LoadTexture("./res/flower_11.png");
 	spot_back = LoadTexture("./res/spot_back_w.png");
+	is_muted = LoadTexture("./res/mute.png");
+	not_muted = LoadTexture("./res/not_mute.png");
 
-	for(auto c : current_level.connections) {
-		int start_index = c.start.y * MAP_SZ + c.start.x;
-		int end_index = c.end.y * MAP_SZ + c.end.x;
-		map[start_index] = c.id;
-		map[end_index] = c.id;
-	}
+	add_point = LoadSound("./res/add_point.wav");
+	fail = LoadSound("./res/no.wav");
+	complete_point = LoadSound("./res/complete.wav");
+
+	loop_back = LoadMusicStream("./res/back.ogg");
+	PlayMusicStream(loop_back);
+
+	start_anim = true;
+	quad_info.y = window_size.x;
 }
 
-void add_path_particle(vec2 pos) {
+void add_path_particle(vec2 pos, vec2 dir) {
 	vec2 render_pos = pos * CELL_SZ;
-	Particle particle = {
-		.type = PATH,
-		.pos = render_pos,
-		.vel = v2(GetRandomValue(230, 250), GetRandomValue(230, 250)),
-		.dir = v2(GetRandomValue(-1, 1), GetRandomValue(-1, 1)),
-		.size = v2of(10),
-		.color = current_connection->color,
-		.t = PATH_ALIIVE_TIME,
-	};
-	add_particle(particle);
+	render_pos = render_pos + CELL_SZ / 2.f;
+	render_pos = render_pos + v2(GetRandomValue(-10, 10), GetRandomValue(-10, 10));
+	
+	for (int i = 0; i < 10; i += 1) {
+		Particle particle = {
+			.type = PATH,
+			.pos = render_pos,
+			.vel = v2(GetRandomValue(-100, 100), GetRandomValue(-100, 100)),
+			.dir = dir,
+			.size = v2of(8),
+			.off = dir.x != 0 ? v2(GetRandomValue(-5, 5), 0) : v2(0, GetRandomValue(-5, 5)),
+			.color = current_connection->color,
+			.t = 0,
+		};
+		add_particle(particle);
+	}
 }
 
 void update() {
 	// :update
+
+	if (muted) {
+		volume = 0;
+	} 
+	volume = Lerp(volume, MUSIC_VOLUME, 0.1 * GetFrameTime());
+	SetMusicVolume(loop_back, volume);
+	UpdateMusicStream(loop_back);
+	
+	if (start_anim) {
+		if (quad_info.y < window_size.x) {
+			quad_info.y += 50;
+		} else {
+			if (!change_level) {
+				change_level = true;
+				next_level();
+			}
+			anim_time += GetFrameTime();
+		}
+		
+		if (anim_time > 1) {
+			
+			quad_info.x += 50;
+		}
+
+		if (quad_info.x > window_size.x && anim_time > 2) {
+			start_anim = false;
+			change_level = false;
+			quad_info = Vector2Zero();
+			anim_time = 0;
+		}
+		
+		return;
+	}
+	
 	hover_cell = GetScreenToWorld2D(GetMousePosition(), cam);
 	hover_cell.x = c(int, hover_cell.x) >> 5;
 	hover_cell.y = c(int, hover_cell.y) >> 5;
@@ -328,8 +536,12 @@ void update() {
 					if (last_point == hover_cell) {
 						current_connection->points.pop();
 					} else {
+						// Adding new point
+						vec2 dir = Vector2Normalize(hover_cell - current_connection->points.last());
+						dir = Vector2Negate(dir);
 						current_connection->points.append(hover_cell);
-						add_path_particle(hover_cell);
+						add_path_particle(hover_cell, dir);
+						PlaySound(add_point);
 					}
 				} else if(hover_cell == to_check && id_at(hover_cell) == current_connection->id) {
 					current_connection->points.append(hover_cell);
@@ -360,6 +572,7 @@ void update() {
 			}
 			current_connection->done = true;
 			current_connection = NULL;
+			PlaySound(complete_point);
 		}
 	}
 	prev_hover_cell = hover_cell;
@@ -391,7 +604,7 @@ void render() {
 					if (c.points.count > 1) {
 						vec2 last_point = c.points.items[0];
 						for(int i = 1; i < c.points.count; i++) {
-							DrawLineEx((last_point * CELL_SZ) + CELL_SZ / 2.f, (c.points.items[i] * CELL_SZ) + CELL_SZ / 2.f, 6.f, c.color);
+							DrawLineEx((last_point * CELL_SZ) + CELL_SZ / 2.f, (c.points.items[i] * CELL_SZ) + CELL_SZ / 2.f, LINE_WIDTH, c.color);
 							last_point = c.points.items[i];
 						}
 					}
@@ -406,7 +619,25 @@ void render() {
 					if (at == 0) continue;
 					Texture tex = tex_from_id(at);
 					vec2 size = v2of(CELL_SZ);
-					DrawTextureEx(tex, pos-9, 0, .8f, WHITE);
+					
+					if (hover_cell == v2(x, y)) {
+						hover_timer = fmaxf(hover_timer + GetFrameTime(), .2);
+					} else {
+						hover_timer = fmaxf(hover_timer - GetFrameTime(), 0);
+					}
+
+
+
+					if (hover_cell == v2(x, y) && !FloatEquals(hover_timer, 0)) {
+						Vector2 origin = v2of(64) / 2 * (0.8 + hover_timer) / 2;
+						DrawTexturePro(tex, {0, 0, 64, 64}, 
+						               {v2e((pos - 9) + (origin / 2)), 64 * (.8f + hover_timer), 64 * (.8f + hover_timer)},
+						               origin,
+						               0,
+						               WHITE);
+					} else {
+						DrawTextureEx(tex, pos-9, 0, .8f, WHITE);
+					}
 				}
 			}
 #if 0
@@ -417,6 +648,7 @@ void render() {
 					vec2 pos = v2(x, y) * CELL_SZ;
 					if (at == 0) continue;
 					vec2 size = v2of(CELL_SZ);
+					
 					DrawRectangleV(pos, size,  WHITE);
 					DrawText(TextFormat("%d", at2), pos.x, pos.y, 10, BLACK);
 				}
@@ -427,15 +659,19 @@ void render() {
 			if (hover_cell.x >= 0 && hover_cell.x <= 9 && hover_cell.y >= 0 && hover_cell.y <= 9) {
 				int at = map[int(hover_cell.y * MAP_SZ + hover_cell.x)];
 				hover_cell = hover_cell * CELL_SZ;
+#if 0
 				if (at) {
 					DrawText(TextFormat("%d", at), hover_cell.x + 10, hover_cell.y + 10, 10, ORANGE);
 				}
+#endif
 				DrawRectangleLinesEx({hover_cell.x, hover_cell.y, CELL_SZ, CELL_SZ}, 2.f, at == 0 ? RED : GREEN);
 			}
 
 			render_particle();
 		}
 		EndMode2D();	
+
+		
 	}
 	EndTextureMode();
 
@@ -464,27 +700,12 @@ void render() {
 				0,
 				WHITE);
 
-#if 1
+#if 0
 		if (current_connection) {
 			for (int i = 0; i < current_connection->points.count; i+=1) {
 				DrawTextEx(font16, TextFormat("[%d] %f %f", i, current_connection->points.items[i].x, current_connection->points.items[i].y), v2(10, i * 16), 16, 2, WHITE);
 			}
 		}
-		// auto text = TextFormat("%.2f, %.2f", start_line.x, start_line.y);
-		// vec2 size = MeasureTextEx(font32, text, 32, 2);
-		// DrawTextEx(font32, text, {window_size.x - size.x - 10, 10}, 32, 2, WHITE);
-		// text = TextFormat("%.2f/%.2f", end_line.x, end_line.y);
-		// size = MeasureTextEx(font32, text, 32, 2);
-		// DrawTextEx(font32, text, {window_size.x - size.x - 10, 10 + 32 + 10}, 32, 2, WHITE);
-		// text = TextFormat("%.2f, %.2f", new_p_pos.x, new_p_pos.y);
-		// size = MeasureTextEx(font32, text, 32, 2);
-		// DrawTextEx(font32, text, {window_size.x - size.x - 10, 10 + 32 + 10 + 32 + 10}, 32, 2, WHITE);
-		// text = TextFormat("Activator: %d", activators[0].activated);
-		// size = MeasureTextEx(font32, text, 32, 2);
-		// DrawTextEx(font32, text, {window_size.x - size.x - 10, 10 + 32 + 10 + 32 + 10 + 32 + 10}, 32, 2, WHITE);
-		// text = TextFormat("Reached end: %d", at_end);
-		// size = MeasureTextEx(font32, text, 32, 2);
-		// DrawTextEx(font32, text, {window_size.x - size.x - 10, 10 + 32 + 10 + 32 + 10 + 32 + 10 + 32 + 10}, 32, 2, WHITE);
 		// :debug
 #endif
 
@@ -497,50 +718,60 @@ void render() {
 					(MAP_SZ * CELL_SZ),
 					(MAP_SZ * CELL_SZ));
 
-			// :objective
-			{
-				const char* text = "Reach the pink thing with the available steps.";
-				auto goal_size = zwv4(text_size(font16, text));
-				vec2 dgoal{10, window_size.y - 10 - goal_size.y};
-				label(font16, text, dgoal, BLACK);
-			}
-
 			// :level
-			{
+			if (level_id != 9){
 				auto dnext = v4zw(100, 32);
-				br_of(screen, &dnext);
-				pad_br(&dnext, 10);
-
+				b_of(screen, &dnext);
+				center_x(screen, &dnext);
+				pad_b(&dnext, 10);
+				
 				bool enabled = true;
-				if (ui_btn(font32, "Next", dnext, enabled)) {
-					// for (auto c : current_level.connections) {
-					// 	if (c.id == 0) continue;
-					// 	if (!c.done) {
-					// 		enabled = false;
-					// 		printf("%d not enabled!\n", c.id); printv(c.start); printv(c.end);
-					// 		break;
-					// 	}
-					// }
-					next_level();	
+				for (auto c : current_level.connections) {
+					if (c.id == 0) continue;
+					if (!c.done) {
+						enabled = false;
+						break;
+					}
+				}
+				
+				if (ui_btn(font32, "Next", dnext, enabled, fail)) {
+					start_anim = true;
 				}
 			}
 
-			// :fill
 			{
-				int filled{};
-				for (int i = 0; i < MAP_SZ * MAP_SZ; i+=1) {
-					if(filled_map[i] == 1) filled += 1;
+				auto dpos = v4(10, 10, 32, 32);
+				if (CheckCollisionPointRec(GetMousePosition(), to_rect(dpos))) {
+					if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+						muted = !muted;
+					}
 				}
-				float fill_percentage = (float(filled) / (MAP_SZ * MAP_SZ)) * 100.f;
-				auto text = TextFormat("Fill: %.1f%%", fill_percentage);
-				auto dfill = text_size(font32, text);
-				center_x(screen, &dfill);
 
-				label(font32, text, xyv4(dfill));
+				DrawTextureV(muted ? not_muted : is_muted, xyv4(dpos), WHITE);		
 			}
+
+			if (start_anim) {
+				DrawRectangleV(v2(quad_info.x, 0), v2(quad_info.y, window_size.y), BEIGE);
+				if (change_level && anim_time < 1) {
+					if (anim_time < 0.5) {
+						text_info.y = Lerp(text_info.y, 1, 0.1);
+					} else {
+						text_info.y = Lerp(text_info.y, 0, 0.1);
+					}
+					
+					const char* text = TextFormat("LEVEL %d", level_id + 1);
+					auto dlabel = text_size(font64, text);
+				
+					center(screen, &dlabel);
+					Color c = ColorAlpha(WHITE, text_info.y);
+					label(font64, text, xyv4(dlabel), WHITE);
+				}
+			}	
 		}
 	}
 	EndDrawing();
+
+	last_hover = current_hover;
 }
 
 #if defined(PLATFORM_WEB)

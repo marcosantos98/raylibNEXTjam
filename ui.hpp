@@ -83,7 +83,7 @@ inline pair<bool, bool> check_hover_click(vec4 dest) {
 	};
 }
 
-static bool ui_btn(Font font, const char* text, vec4 dest, bool enabled = true) {
+static bool ui_btn(Font font, const char* text, vec4 dest, bool enabled = true, Sound fail = {}) {
 	auto [hover, click] = check_hover_click(dest);
 
 	vec2 text_size = MeasureTextEx(font, text, font.baseSize, 2.f);	
@@ -95,6 +95,10 @@ static bool ui_btn(Font font, const char* text, vec4 dest, bool enabled = true) 
 	} 
 	if (!enabled) {
 		color = ColorTint(color, DARKGRAY);
+	}
+
+	if (!enabled && click) {
+		PlaySound(fail);
 	}
 
 	DrawRectangleRec(to_rect(dest), color);
@@ -116,12 +120,15 @@ static void center_x(vec4 where, vec4* who) {
 	who->x += floorf((where.z - who->z) * .5);
 }
 
-static void br_of(vec4 where, vec4* who) {
-	who->x = where.x + where.z - who->z;
+static void center(vec4 where, vec4* who) {
+	who->x += floorf((where.z - who->z) * .5);
+	who->y += floorf((where.w - who->w) * .5);
+}
+
+static void b_of(vec4 where, vec4* who) {
 	who->y = where.y + where.w - who->w;
 }
 
-static void pad_br(vec4* who, float amt) {
-	who->x -= amt;
+static void pad_b(vec4* who, float amt) {
 	who->y -= amt;
 }
